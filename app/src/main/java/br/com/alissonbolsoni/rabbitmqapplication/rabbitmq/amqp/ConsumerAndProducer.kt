@@ -7,7 +7,7 @@ import com.rabbitmq.client.ConnectionFactory
 import com.rabbitmq.client.DeliverCallback
 import java.util.concurrent.TimeUnit
 
-class Consumer(
+class ConsumerAndProducer(
     config: AmqpConfig,
     private val mOnReceiveMessageHandler: OnReceiveMessageHandler
 ) : ConnectToRabbitMQ(config) {

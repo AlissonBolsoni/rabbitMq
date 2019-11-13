@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Handler
 import android.util.Log
-import br.com.alissonbolsoni.rabbitmqapplication.rabbitmq.amqp.Consumer
+import br.com.alissonbolsoni.rabbitmqapplication.rabbitmq.amqp.ConsumerAndProducer
 import br.com.alissonbolsoni.rabbitmqapplication.rabbitmq.amqp.OnReceiveMessageHandler
 import br.com.alissonbolsoni.rabbitmqapplication.rabbitmq.amqp.objects.AmqpExchanges
 import br.com.alissonbolsoni.rabbitmqapplication.rabbitmq.amqp.objects.AmqpConfig
@@ -24,7 +24,7 @@ class RabbitMqService : Service() {
         runBlocking(Dispatchers.Main) { Handler() }
     }
 
-    private var consumer: Consumer? = null
+    private var consumerAndProducer: ConsumerAndProducer? = null
     private val lostMessages = LinkedHashMap<String, String>()
     private val amqpConfig: AmqpConfig by inject()
     lateinit var updateCallback: UpdateCallback
@@ -37,12 +37,12 @@ class RabbitMqService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceJob.cancel()
-        consumer?.dispose()
-        consumer = null
+        consumerAndProducer?.dispose()
+        consumerAndProducer = null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (consumer == null) {
+        if (consumerAndProducer == null) {
             init()
         }
 
@@ -58,15 +58,15 @@ class RabbitMqService : Service() {
                 bindToExchange()
             } catch (ex: Exception) {
                 Log.e(TAG, "INIT EXEPTION", ex)
-                consumer?.dispose()
+                consumerAndProducer?.dispose()
                 handler.postDelayed(Runnable { init() }, 5_000)
             }
         }
     }
 
     private fun connectAmqp() {
-        consumer = Consumer(amqpConfig, createOnReceiveMessageHandler())
-        consumer!!.connectToRabbitMQ()
+        consumerAndProducer = ConsumerAndProducer(amqpConfig, createOnReceiveMessageHandler())
+        consumerAndProducer!!.connectToRabbitMQ()
     }
 
     private fun createOnReceiveMessageHandler(): OnReceiveMessageHandler {
@@ -86,7 +86,7 @@ class RabbitMqService : Service() {
     @Throws(Exception::class)
     private fun bindToExchange() {
         for (exchange in amqpConfig.listExchangeToReceive) {
-            consumer?.binding(exchange, amqpConfig.queueName())
+            consumerAndProducer?.binding(exchange, amqpConfig.queueName())
         }
     }
 
@@ -97,7 +97,7 @@ class RabbitMqService : Service() {
 
     private fun sendToAmqp(exchange: String, json: String) = runBlocking(Dispatchers.IO) {
         try {
-            consumer?.publish(exchange, json)
+            consumerAndProducer?.publish(exchange, json)
         } catch (e: Exception) {
             Log.e(TAG, "Fail to publish message -> $json", e)
             lostMessages[exchange] = json
@@ -119,5 +119,4 @@ class RabbitMqService : Service() {
             service.sendToAmqp(amqpExchanges, json)
         }
     }
-
 }
